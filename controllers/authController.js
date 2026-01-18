@@ -463,6 +463,94 @@ const switchRole = asyncHandler(async (req, res) => {
   });
 });
 
+// OAuth login handler
+const oauthLogin = asyncHandler(async (req, res) => {
+  const { email, name, provider, providerId, role } = req.body;
+
+  if (!email || !name || !provider) {
+    return res.status(400).json({
+      success: false,
+      message: "Email, name, and provider are required"
+    });
+  }
+
+  const sanitizedEmail = sanitizeInput(email.toLowerCase());
+  const sanitizedName = sanitizeInput(name);
+
+  // Check if user exists
+  let user = await User.findOne({ email: sanitizedEmail });
+
+  if (user) {
+    // Existing user - handle role addition or login
+    if (role && !user.roles.includes(role)) {
+      // Adding new role
+      user.roles.push(role);
+      await user.save();
+      
+      const token = user.generateToken();
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          roles: user.roles,
+          primaryRole: user.primaryRole,
+        },
+        needsProfileCompletion: true
+      });
+    }
+    
+    // Regular login
+    const token = user.generateToken();
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        roles: user.roles,
+        primaryRole: user.primaryRole,
+      }
+    });
+  }
+
+  // New user
+  if (!role) {
+    return res.json({
+      success: true,
+      needsRoleSelection: true
+    });
+  }
+
+  // Create new user with role
+  user = await User.create({
+    name: sanitizedName,
+    email: sanitizedEmail,
+    roles: [role],
+    primaryRole: role,
+    isVerified: true,
+    oauthProvider: provider,
+    oauthId: providerId
+  });
+
+  const token = user.generateToken();
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      roles: user.roles,
+      primaryRole: user.primaryRole,
+    },
+    needsProfileCompletion: true
+  });
+});
+
 module.exports = {
   register,
   login,
@@ -471,4 +559,5 @@ module.exports = {
   completeProfile,
   completeFreelancerProfile,
   switchRole,
+  oauthLogin,
 };
