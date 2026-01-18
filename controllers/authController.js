@@ -570,12 +570,10 @@ const updateRole = asyncHandler(async (req, res) => {
   }
 
   const sanitizedEmail = sanitizeInput(email.toLowerCase());
-  
-  // For OAuth users, create new user with selected role
-  const oauthName = localStorage?.getItem?.("oauthName") || sanitizedEmail.split('@')[0];
+  const userName = sanitizedEmail.split('@')[0];
   
   const user = await User.create({
-    name: oauthName,
+    name: userName,
     email: sanitizedEmail,
     roles: [role],
     primaryRole: role,
