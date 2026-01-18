@@ -7,12 +7,7 @@ const {
   resendOTP,
   completeProfile,
   completeFreelancerProfile,
-  completeOAuthProfile,
-  oauthLogin,
-  getMe,
   switchRole,
-  updateRole,
-  createAccount,
 } = require("../controllers/authController");
 const { protect } = require("../middleware/auth");
 
@@ -40,16 +35,12 @@ const loginValidation = [
 
 // Routes
 router.post("/register", registerValidation, register);
-router.post("/create-account", createAccount);
 router.post("/login", loginValidation, login);
 router.post("/verify-otp", verifyOTP);
 router.post("/resend-otp", resendOTP);
 router.post("/complete-profile", completeProfile);
 router.post("/complete-freelancer-profile", completeFreelancerProfile);
-router.post("/complete-oauth-profile", completeOAuthProfile);
-router.post("/oauth-login", oauthLogin);
-router.post("/update-role", updateRole);
-router.get("/me", protect, getMe);
+router.post("/complete-oauth-profile", completeFreelancerProfile);
 router.post("/switch-role", protect, switchRole);
 
 module.exports = router;
