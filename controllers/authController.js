@@ -551,6 +551,52 @@ const oauthLogin = asyncHandler(async (req, res) => {
   });
 });
 
+// Update user role (for OAuth users)
+const updateRole = asyncHandler(async (req, res) => {
+  const { email, role } = req.body;
+
+  if (!email || !role) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and role are required"
+    });
+  }
+
+  if (!VALID_ROLES.includes(role)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid role"
+    });
+  }
+
+  const sanitizedEmail = sanitizeInput(email.toLowerCase());
+  
+  // For OAuth users, create new user with selected role
+  const oauthName = localStorage?.getItem?.("oauthName") || sanitizedEmail.split('@')[0];
+  
+  const user = await User.create({
+    name: oauthName,
+    email: sanitizedEmail,
+    roles: [role],
+    primaryRole: role,
+    isVerified: true
+  });
+
+  const token = user.generateToken();
+
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      roles: user.roles,
+      primaryRole: user.primaryRole,
+    },
+  });
+});
+
 module.exports = {
   register,
   login,
@@ -560,4 +606,5 @@ module.exports = {
   completeFreelancerProfile,
   switchRole,
   oauthLogin,
+  updateRole,
 };

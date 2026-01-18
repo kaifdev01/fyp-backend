@@ -9,6 +9,7 @@ const {
   completeFreelancerProfile,
   switchRole,
   oauthLogin,
+  updateRole,
 } = require("../controllers/authController");
 const { protect } = require("../middleware/auth");
 
@@ -44,5 +45,6 @@ router.post("/complete-freelancer-profile", completeFreelancerProfile);
 router.post("/complete-oauth-profile", completeFreelancerProfile);
 router.post("/switch-role", protect, switchRole);
 router.post("/oauth-login", oauthLogin);
+router.post("/update-role", updateRole);
 
 module.exports = router;
