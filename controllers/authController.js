@@ -575,6 +575,7 @@ const updateRole = asyncHandler(async (req, res) => {
   const user = await User.create({
     name: userName,
     email: sanitizedEmail,
+    password: crypto.randomBytes(32).toString('hex'), // Random password for OAuth users
     roles: [role],
     primaryRole: role,
     isVerified: true
