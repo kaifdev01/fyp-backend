@@ -5,7 +5,7 @@ require("dotenv").config();
 const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB
-// connectDB(); // Handled in app.js middleware for serverless compatibility
+connectDB(); // Handled in app.js middleware for serverless compatibility
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

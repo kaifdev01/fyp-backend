@@ -10,41 +10,61 @@ const {
   switchRole,
   oauthLogin,
   updateRole,
+  forgotPassword,
+  resetPassword,
 } = require("../controllers/authController");
+const {
+  authValidation,
+  handleValidationErrors,
+} = require("../middleware/validation");
 const { protect } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Validation rules
-const registerValidation = [
-  body("name")
-    .trim()
-    .isLength({ min: 2 })
-    .withMessage("Name must be at least 2 characters"),
-  body("email").isEmail().withMessage("Please enter a valid email"),
-  body("password")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters"),
-  body("role")
-    .isIn(["client", "freelancer"])
-    .withMessage("Role must be client or freelancer"),
-];
-
-const loginValidation = [
-  body("email").isEmail().withMessage("Please enter a valid email"),
-  body("password").notEmpty().withMessage("Password is required"),
-];
-
 // Routes
-router.post("/register", registerValidation, register);
-router.post("/login", loginValidation, login);
+router.post(
+  "/register",
+  authValidation.register,
+  handleValidationErrors,
+  register
+);
+router.post("/login", authValidation.login, handleValidationErrors, login);
 router.post("/verify-otp", verifyOTP);
 router.post("/resend-otp", resendOTP);
-router.post("/complete-profile", completeProfile);
-router.post("/complete-freelancer-profile", completeFreelancerProfile);
-router.post("/complete-oauth-profile", completeFreelancerProfile);
+router.post(
+  "/complete-profile",
+  authValidation.completeProfile,
+  handleValidationErrors,
+  completeProfile
+);
+router.post(
+  "/complete-freelancer-profile",
+  authValidation.completeFreelancerProfile,
+  handleValidationErrors,
+  completeFreelancerProfile
+);
+router.post(
+  "/complete-oauth-profile",
+  authValidation.completeFreelancerProfile,
+  handleValidationErrors,
+  completeFreelancerProfile
+);
 router.post("/switch-role", protect, switchRole);
 router.post("/oauth-login", oauthLogin);
 router.post("/update-role", updateRole);
+
+// Password recovery
+router.post(
+  "/forgot-password",
+  authValidation.forgotPassword,
+  handleValidationErrors,
+  forgotPassword
+);
+router.post(
+  "/reset-password/:token",
+  authValidation.resetPassword,
+  handleValidationErrors,
+  resetPassword
+);
 
 module.exports = router;

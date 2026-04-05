@@ -4,7 +4,32 @@ const rateLimit = require('express-rate-limit');
 // Input sanitization helper
 const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
-  return input.trim().replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  return input
+    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+\s*=/gi, '') // Remove event handlers
+    .trim();
+};
+
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+  // At least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  return passwordRegex.test(password);
+};
+
+const validateFileType = (mimetype) => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  return allowedTypes.includes(mimetype);
+};
+
+const validateFileSize = (size, maxSize = 5 * 1024 * 1024) => { // 5MB default
+  return size <= maxSize;
 };
 
 // Validation rules
@@ -43,7 +68,6 @@ const authValidation = {
   ],
 
   resetPassword: [
-    body('token').notEmpty().withMessage('Reset token required'),
     body('password')
       .isLength({ min: 8 })
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
@@ -63,18 +87,17 @@ const authValidation = {
   completeFreelancerProfile: [
     body('email').isEmail().normalizeEmail(),
     body('bio')
+      .optional()
       .trim()
-      .isLength({ min: 10, max: 500 })
-      .customSanitizer(sanitizeInput),
-    body('skills')
-      .trim()
-      .isLength({ min: 1 })
+      .isLength({ min: 1, max: 1500 })
       .customSanitizer(sanitizeInput),
     body('phone')
+      .optional()
       .trim()
-      .matches(/^[\+]?[1-9][\d]{0,15}$/)
+      .matches(/^[\+]?[0-9\s\-\(\)]{7,20}$/)
       .withMessage('Invalid phone number'),
     body('hourlyRate')
+      .optional()
       .isFloat({ min: 1, max: 10000 })
       .withMessage('Hourly rate must be between $1-$10000')
   ]
@@ -113,5 +136,9 @@ module.exports = {
   authLimiter,
   generalLimiter,
   handleValidationErrors,
-  sanitizeInput
+  sanitizeInput,
+  validateEmail,
+  validatePassword,
+  validateFileType,
+  validateFileSize
 };

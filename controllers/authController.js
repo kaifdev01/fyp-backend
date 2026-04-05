@@ -1,12 +1,13 @@
 const User = require("../models/User");
 const TemporaryUser = require("../models/TemporaryUser");
+const Notification = require("../models/Notification");
 const sendEmail = require("../utils/sendEmail");
 const crypto = require("crypto");
 const { asyncHandler } = require("../middleware/errorHandler");
-const { sanitizeInput } = require("../middleware/validation");
+const { sanitizeInput = (val) => val } = require("../middleware/validation");
 
 // Valid roles
-const VALID_ROLES = ['freelancer', 'client'];
+const VALID_ROLES = ["freelancer", "client"];
 
 // Register user
 const register = asyncHandler(async (req, res) => {
@@ -16,7 +17,7 @@ const register = asyncHandler(async (req, res) => {
   if (!name || !email || !password || !role) {
     return res.status(400).json({
       success: false,
-      message: "Name, email, password, and role are required"
+      message: "Name, email, password, and role are required",
     });
   }
 
@@ -24,14 +25,14 @@ const register = asyncHandler(async (req, res) => {
   if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({
       success: false,
-      message: "Invalid role. Must be 'freelancer' or 'client'"
+      message: "Invalid role. Must be 'freelancer' or 'client'",
     });
   }
 
   // Sanitize inputs
   const sanitizedName = sanitizeInput(name);
   const sanitizedEmail = sanitizeInput(email.toLowerCase());
-  const sanitizedLocation = sanitizeInput(location || '');
+  const sanitizedLocation = sanitizeInput(location || "");
 
   // Check if user exists
   const existingUser = await User.findOne({ email: sanitizedEmail });
@@ -45,7 +46,7 @@ const register = asyncHandler(async (req, res) => {
     }
 
     // User wants to add a new role - send OTP for verification
-    const otp = crypto.randomBytes(3).toString('hex').toUpperCase();
+    const otp = crypto.randomBytes(3).toString("hex").toUpperCase();
     const otpExpires = Date.now() + 10 * 60 * 1000;
 
     await TemporaryUser.findOneAndUpdate(
@@ -93,7 +94,7 @@ const register = asyncHandler(async (req, res) => {
   }
 
   // Generate OTP and store user data temporarily
-  const otp = crypto.randomBytes(3).toString('hex').toUpperCase();
+  const otp = crypto.randomBytes(3).toString("hex").toUpperCase();
   const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
   await TemporaryUser.findOneAndUpdate(
@@ -147,18 +148,20 @@ const login = asyncHandler(async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({
       success: false,
-      message: "Email and password are required"
+      message: "Email and password are required",
     });
   }
 
   const sanitizedEmail = sanitizeInput(email.toLowerCase());
 
   // Check if user exists and get password
-  const user = await User.findOne({ email: sanitizedEmail }).select("+password");
+  const user = await User.findOne({ email: sanitizedEmail }).select(
+    "+password"
+  );
   if (!user || !(await user.comparePassword(password))) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       success: false,
-      message: "Invalid credentials" 
+      message: "Invalid credentials",
     });
   }
 
@@ -166,9 +169,13 @@ const login = asyncHandler(async (req, res) => {
   if (!user.isVerified) {
     return res.status(401).json({
       success: false,
-      message: "Please verify your email before logging in"
+      message: "Please verify your email before logging in",
     });
   }
+
+  // Update last activity on login
+  user.lastActivity = new Date();
+  await user.save();
 
   const token = user.generateToken();
 
@@ -192,7 +199,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
   if (!email || !otp) {
     return res.status(400).json({
       success: false,
-      message: "Email and OTP are required"
+      message: "Email and OTP are required",
     });
   }
 
@@ -202,14 +209,14 @@ const verifyOTP = asyncHandler(async (req, res) => {
   if (!tempUser) {
     return res.status(404).json({
       success: false,
-      message: "Registration not found or expired"
+      message: "Registration not found or expired",
     });
   }
 
   if (tempUser.otp !== otp.toUpperCase() || Date.now() > tempUser.otpExpires) {
     return res.status(400).json({
       success: false,
-      message: "Invalid or expired OTP"
+      message: "Invalid or expired OTP",
     });
   }
 
@@ -223,7 +230,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found"
+        message: "User not found",
       });
     }
     if (!user.roles.includes(registrationData.role)) {
@@ -265,7 +272,7 @@ const resendOTP = asyncHandler(async (req, res) => {
   if (!email) {
     return res.status(400).json({
       success: false,
-      message: "Email is required"
+      message: "Email is required",
     });
   }
 
@@ -275,12 +282,12 @@ const resendOTP = asyncHandler(async (req, res) => {
   if (!tempUser) {
     return res.status(404).json({
       success: false,
-      message: "Registration not found"
+      message: "Registration not found",
     });
   }
 
   // Generate new OTP
-  const otp = crypto.randomBytes(3).toString('hex').toUpperCase();
+  const otp = crypto.randomBytes(3).toString("hex").toUpperCase();
   const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
   // Update pending registration with new OTP
@@ -313,30 +320,62 @@ const resendOTP = asyncHandler(async (req, res) => {
 
 // Complete profile for clients
 const completeProfile = asyncHandler(async (req, res) => {
-  const { email, companyName, companySize, website } = req.body;
+  const {
+    email,
+    companyName,
+    companySize,
+    website,
+    industry,
+    companyDescription,
+    companyLogo,
+    phone,
+    budgetRange,
+    preferredSkills,
+    projectTypes,
+  } = req.body;
 
   if (!email || !companyName || !companySize) {
     return res.status(400).json({
       success: false,
-      message: "Email, company name, and company size are required"
+      message: "Email, company name, and company size are required",
     });
   }
 
   const sanitizedEmail = sanitizeInput(email.toLowerCase());
   const user = await User.findOne({ email: sanitizedEmail });
-  
+
   if (!user) {
     return res.status(404).json({
       success: false,
-      message: "User not found"
+      message: "User not found",
     });
   }
 
   // Update user profile
   user.companySize = sanitizeInput(companySize);
-  user.industry = sanitizeInput(companyName);
+  user.industry = sanitizeInput(industry || companyName);
   if (website) {
     user.bio = sanitizeInput(website);
+  }
+  if (companyDescription) {
+    user.companyDescription = sanitizeInput(companyDescription);
+  }
+  if (companyLogo) {
+    user.companyLogo = sanitizeInput(companyLogo);
+  }
+  if (phone) {
+    user.phone = sanitizeInput(phone);
+  }
+  if (budgetRange) {
+    user.budgetRange = sanitizeInput(budgetRange);
+  }
+  if (preferredSkills && Array.isArray(preferredSkills)) {
+    user.preferredSkills = preferredSkills.map((skill) =>
+      sanitizeInput(skill)
+    );
+  }
+  if (projectTypes && Array.isArray(projectTypes)) {
+    user.projectTypes = projectTypes.map((type) => sanitizeInput(type));
   }
 
   await user.save();
@@ -359,40 +398,157 @@ const completeProfile = asyncHandler(async (req, res) => {
 
 // Complete profile for freelancers
 const completeFreelancerProfile = asyncHandler(async (req, res) => {
-  const { email, skills, experience, hourlyRate, bio, title, description } = req.body;
+  const {
+    email,
+    skills,
+    experience,
+    hourlyRate,
+    bio,
+    title,
+    phone,
+    avatar,
+    timezone,
+    languages,
+    education,
+    portfolio,
+    isAvailable,
+    kyc,
+  } = req.body;
 
   if (!email) {
     return res.status(400).json({
       success: false,
-      message: "Email is required"
+      message: "Email is required",
+    });
+  }
+
+  // Validate hourly rate
+  if (hourlyRate && (hourlyRate < 5 || hourlyRate > 500)) {
+    return res.status(400).json({
+      success: false,
+      message: "Hourly rate must be between $5 and $500",
     });
   }
 
   const sanitizedEmail = sanitizeInput(email.toLowerCase());
   const user = await User.findOne({ email: sanitizedEmail });
-  
+
   if (!user) {
     return res.status(404).json({
       success: false,
-      message: "User not found"
+      message: "User not found",
     });
   }
 
-  // Update freelancer profile with flexible field handling
+  // Update freelancer profile
   if (skills) {
-    user.skills = Array.isArray(skills) ? skills.map(skill => sanitizeInput(skill)) : [sanitizeInput(skills)];
+    user.skills = Array.isArray(skills)
+      ? skills.map((skill) => sanitizeInput(skill))
+      : [sanitizeInput(skills)];
   }
   if (experience) {
-    user.experience = sanitizeInput(experience);
+    if (!["beginner", "intermediate", "expert"].includes(experience)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid experience level",
+      });
+    }
+    user.experience = experience;
   }
   if (hourlyRate) {
     user.hourlyRate = parseFloat(hourlyRate);
   }
-  if (bio || description) {
-    user.bio = sanitizeInput(bio || description);
+  if (bio) {
+    if (bio.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: "Bio cannot exceed 500 characters",
+      });
+    }
+    user.bio = sanitizeInput(bio);
   }
   if (title) {
     user.title = sanitizeInput(title);
+  }
+  if (phone) {
+    user.phone = sanitizeInput(phone);
+  }
+  if (avatar) {
+    user.avatar = sanitizeInput(avatar);
+  }
+  if (timezone) {
+    user.timezone = sanitizeInput(timezone);
+  }
+  if (isAvailable !== undefined) {
+    user.isAvailable = isAvailable;
+  }
+
+  // Update languages
+  if (languages && Array.isArray(languages)) {
+    user.languages = languages.map((lang) => ({
+      language: sanitizeInput(lang.language),
+      proficiency: lang.proficiency,
+    }));
+  }
+
+  // Update education
+  if (education && Array.isArray(education)) {
+    user.education = education.map((edu) => ({
+      school: sanitizeInput(edu.school),
+      degree: sanitizeInput(edu.degree),
+      field: sanitizeInput(edu.field),
+      startYear: sanitizeInput(edu.startYear),
+      endYear: sanitizeInput(edu.endYear),
+      description: sanitizeInput(edu.description),
+    }));
+  }
+
+  // Update portfolio
+  if (portfolio && Array.isArray(portfolio)) {
+    user.portfolio = portfolio.map((item) => ({
+      title: sanitizeInput(item.title),
+      description: sanitizeInput(item.description),
+      image: sanitizeInput(item.image),
+      url: sanitizeInput(item.url),
+      media: Array.isArray(item.media)
+        ? item.media.map((media) => ({
+            url: sanitizeInput(media.url),
+            type: media.type,
+            name: sanitizeInput(media.name),
+          }))
+        : [],
+      createdAt: item.createdAt || new Date(),
+    }));
+  }
+
+  // Update KYC data if provided
+  if (kyc) {
+    user.kyc = {
+      status: "pending",
+      documentType: sanitizeInput(kyc.documentType),
+      documentNumber: sanitizeInput(kyc.documentNumber),
+      documentImage: sanitizeInput(kyc.documentImage),
+      selfieImage: sanitizeInput(kyc.selfieImage),
+      dateOfBirth: kyc.dateOfBirth ? new Date(kyc.dateOfBirth) : null,
+      country: sanitizeInput(kyc.country),
+      address: sanitizeInput(kyc.address),
+      city: sanitizeInput(kyc.city),
+      postalCode: sanitizeInput(kyc.postalCode),
+    };
+
+    // Create notification for admins
+    await Notification.create({
+      userId: user._id,
+      recipientType: "admin",
+      type: "kyc_submitted",
+      title: "New KYC Submission",
+      message: `${user.name} has submitted KYC for verification`,
+      data: {
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+      },
+    });
   }
 
   await user.save();
@@ -421,14 +577,14 @@ const switchRole = asyncHandler(async (req, res) => {
   if (!role) {
     return res.status(400).json({
       success: false,
-      message: "Role is required"
+      message: "Role is required",
     });
   }
 
   if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({
       success: false,
-      message: "Invalid role"
+      message: "Invalid role",
     });
   }
 
@@ -436,14 +592,14 @@ const switchRole = asyncHandler(async (req, res) => {
   if (!user) {
     return res.status(404).json({
       success: false,
-      message: "User not found"
+      message: "User not found",
     });
   }
 
   if (!user.roles.includes(role)) {
     return res.status(400).json({
       success: false,
-      message: "You don't have access to this role"
+      message: "You don't have access to this role",
     });
   }
 
@@ -470,7 +626,7 @@ const oauthLogin = asyncHandler(async (req, res) => {
   if (!email || !name || !provider) {
     return res.status(400).json({
       success: false,
-      message: "Email, name, and provider are required"
+      message: "Email, name, and provider are required",
     });
   }
 
@@ -486,7 +642,7 @@ const oauthLogin = asyncHandler(async (req, res) => {
       // Adding new role
       user.roles.push(role);
       await user.save();
-      
+
       const token = user.generateToken();
       return res.json({
         success: true,
@@ -498,10 +654,10 @@ const oauthLogin = asyncHandler(async (req, res) => {
           roles: user.roles,
           primaryRole: user.primaryRole,
         },
-        needsProfileCompletion: true
+        needsProfileCompletion: true,
       });
     }
-    
+
     // Regular login
     const token = user.generateToken();
     return res.json({
@@ -513,7 +669,7 @@ const oauthLogin = asyncHandler(async (req, res) => {
         email: user.email,
         roles: user.roles,
         primaryRole: user.primaryRole,
-      }
+      },
     });
   }
 
@@ -521,7 +677,7 @@ const oauthLogin = asyncHandler(async (req, res) => {
   if (!role) {
     return res.json({
       success: true,
-      needsRoleSelection: true
+      needsRoleSelection: true,
     });
   }
 
@@ -533,7 +689,7 @@ const oauthLogin = asyncHandler(async (req, res) => {
     primaryRole: role,
     isVerified: true,
     oauthProvider: provider,
-    oauthId: providerId
+    oauthId: providerId,
   });
 
   const token = user.generateToken();
@@ -547,7 +703,7 @@ const oauthLogin = asyncHandler(async (req, res) => {
       roles: user.roles,
       primaryRole: user.primaryRole,
     },
-    needsProfileCompletion: true
+    needsProfileCompletion: true,
   });
 });
 
@@ -558,27 +714,27 @@ const updateRole = asyncHandler(async (req, res) => {
   if (!email || !role) {
     return res.status(400).json({
       success: false,
-      message: "Email and role are required"
+      message: "Email and role are required",
     });
   }
 
   if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({
       success: false,
-      message: "Invalid role"
+      message: "Invalid role",
     });
   }
 
   const sanitizedEmail = sanitizeInput(email.toLowerCase());
-  const userName = sanitizedEmail.split('@')[0];
-  
+  const userName = sanitizedEmail.split("@")[0];
+
   const user = await User.create({
     name: userName,
     email: sanitizedEmail,
-    password: crypto.randomBytes(32).toString('hex'), // Random password for OAuth users
+    password: crypto.randomBytes(32).toString("hex"), // Random password for OAuth users
     roles: [role],
     primaryRole: role,
-    isVerified: true
+    isVerified: true,
   });
 
   const token = user.generateToken();
@@ -593,6 +749,182 @@ const updateRole = asyncHandler(async (req, res) => {
       roles: user.roles,
       primaryRole: user.primaryRole,
     },
+  });
+});
+
+// Update user profile
+const updateProfile = asyncHandler(async (req, res) => {
+  const {
+    bio,
+    location,
+    hourlyRate,
+    phone,
+    skills,
+    languages,
+    isAvailable,
+    avatar,
+    title,
+    timezone,
+    experience,
+  } = req.body;
+  const userId = req.user.id;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  // Update user fields
+  if (bio !== undefined) user.bio = sanitizeInput(bio);
+  if (location !== undefined) user.location = sanitizeInput(location);
+  if (hourlyRate !== undefined) user.hourlyRate = parseFloat(hourlyRate) || 0;
+  if (phone !== undefined) user.phone = sanitizeInput(phone);
+  if (avatar !== undefined) user.avatar = sanitizeInput(avatar);
+  if (title !== undefined) user.title = sanitizeInput(title);
+  if (timezone !== undefined) user.timezone = sanitizeInput(timezone);
+  if (experience !== undefined) user.experience = experience;
+  if (skills !== undefined)
+    user.skills = Array.isArray(skills)
+      ? skills.map((skill) => sanitizeInput(skill))
+      : [];
+  if (languages !== undefined) user.languages = languages;
+  if (isAvailable !== undefined) user.isAvailable = isAvailable;
+
+  await user.save();
+
+  res.json({
+    success: true,
+    message: "Profile updated successfully",
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      bio: user.bio,
+      location: user.location,
+      hourlyRate: user.hourlyRate,
+      phone: user.phone,
+      avatar: user.avatar,
+      title: user.title,
+      timezone: user.timezone,
+      experience: user.experience,
+      skills: user.skills,
+      languages: user.languages,
+      isAvailable: user.isAvailable,
+      roles: user.roles,
+      primaryRole: user.primaryRole,
+    },
+  });
+});
+
+// Forgot Password
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide an email address",
+    });
+  }
+
+  const sanitizedEmail = sanitizeInput(email.toLowerCase());
+  const user = await User.findOne({ email: sanitizedEmail });
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "Email not registered",
+    });
+  }
+
+  // Get reset token
+  const resetToken = user.getResetPasswordToken();
+
+  await user.save({ validateBeforeSave: false });
+
+  // Create reset url
+  const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password/${resetToken}`;
+
+  const message = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #2563eb;">Password Reset Request</h2>
+      <p>You are receiving this email because you (or someone else) has requested the reset of a password.</p>
+      <p>Please click on the link below to reset your password:</p>
+      <div style="margin: 30px 0;">
+        <a href="${resetUrl}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Reset Password</a>
+      </div>
+      <p>This link is valid for 10 minutes only.</p>
+      <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
+    </div>
+  `;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "WorkDesk - Password Reset Request",
+      html: message,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Email sent successfully",
+    });
+  } catch (error) {
+    console.error("Error sending reset email:", error);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(500).json({
+      success: false,
+      message: "Email could not be sent",
+    });
+  }
+});
+
+// Reset Password
+const resetPassword = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+  const { token } = req.params;
+
+  if (!password || !token) {
+    return res.status(400).json({
+      success: false,
+      message: "Password and token are required",
+    });
+  }
+
+  // Hash the received token to compare it with the stored hashed token
+  const resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const user = await User.findOne({
+    resetPasswordToken,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
+  }
+
+  // Set new password
+  user.password = password;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Password reset successful. Please login with your new password.",
   });
 });
 
@@ -606,4 +938,7 @@ module.exports = {
   switchRole,
   oauthLogin,
   updateRole,
+  updateProfile,
+  forgotPassword,
+  resetPassword,
 };
