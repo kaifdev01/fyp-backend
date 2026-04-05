@@ -235,25 +235,22 @@ const userSchema = new mongoose.Schema(
         language: String,
         proficiency: {
           type: String,
-          enum: ["Basic", "Conversational", "Fluent", "Native"],
+          enum: ["basic", "conversational", "fluent", "native"],
         },
       },
     ],
     education: [
       {
-        school: String,
         degree: String,
-        field: String,
-        startYear: String,
-        endYear: String,
-        description: String,
+        institution: String,
+        year: String,
       },
     ],
     kyc: {
       status: {
         type: String,
         enum: ["pending", "verified", "rejected"],
-        default: "pending",
+        default: null,
       },
       documentType: {
         type: String,

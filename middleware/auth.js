@@ -42,9 +42,11 @@ const protect = async (req, res, next) => {
     }
 
     // Update last activity (don't await to avoid slowing down requests)
-    user
-      .updateActivity()
-      .catch((err) => console.error("Failed to update activity:", err));
+    User.findByIdAndUpdate(
+      user._id,
+      { lastActivity: new Date() },
+      { runValidators: false }
+    ).catch((err) => console.error("Failed to update activity:", err));
 
     req.user = user;
     next();

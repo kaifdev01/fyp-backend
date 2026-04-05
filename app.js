@@ -87,10 +87,17 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting
+// Rate limiting - increased limits for development
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Increased from 300 to 1000
+  message: "Too many requests, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for notification polling
+    return req.path.includes('/api/notifications');
+  }
 });
 app.use(limiter);
 
