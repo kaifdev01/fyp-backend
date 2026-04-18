@@ -27,6 +27,14 @@ const temporaryUserSchema = new mongoose.Schema({
     existingUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    is2FA: {
+      type: Boolean,
+      default: false
     }
   }
 }, {

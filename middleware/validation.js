@@ -6,9 +6,19 @@ const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
   return input
     .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
     .replace(/javascript:/gi, '') // Remove javascript: protocol
     .replace(/on\w+\s*=/gi, '') // Remove event handlers
+    .trim();
+};
+
+// Strict sanitizer for plain text fields (strips all HTML)
+const sanitizePlainText = (input) => {
+  if (typeof input !== 'string') return input;
+  return input
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
     .trim();
 };
 
@@ -137,6 +147,7 @@ module.exports = {
   generalLimiter,
   handleValidationErrors,
   sanitizeInput,
+  sanitizePlainText,
   validateEmail,
   validatePassword,
   validateFileType,

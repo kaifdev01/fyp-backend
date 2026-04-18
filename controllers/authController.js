@@ -173,9 +173,97 @@ const login = asyncHandler(async (req, res) => {
     });
   }
 
+  // Generate 2FA OTP
+  const otp = crypto.randomBytes(3).toString("hex").toUpperCase();
+  const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  // Store OTP in temporary collection
+  await TemporaryUser.findOneAndUpdate(
+    { email: sanitizedEmail },
+    {
+      email: sanitizedEmail,
+      otp,
+      otpExpires,
+      registrationData: {
+        userId: user._id,
+        is2FA: true,
+      },
+    },
+    { upsert: true, new: true }
+  );
+
+  // Send 2FA OTP via email
+  try {
+    await sendEmail({
+      email: sanitizedEmail,
+      subject: "WorkDeck - Login Verification Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Login Verification</h2>
+          <p>Someone is trying to log in to your WorkDeck account.</p>
+          <p>Your verification code is:</p>
+          <div style="background: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #1f2937; font-size: 32px; margin: 0;">${otp}</h1>
+          </div>
+          <p>This code will expire in 10 minutes.</p>
+          <p>If you didn't attempt to log in, please ignore this email and change your password immediately.</p>
+        </div>
+      `,
+    });
+  } catch (emailError) {
+    console.log(`Email failed, 2FA OTP for ${sanitizedEmail}: ${otp}`);
+  }
+
+  res.json({
+    success: true,
+    requires2FA: true,
+    message: "Verification code sent to your email",
+  });
+});
+
+// Verify 2FA OTP for login
+const verify2FA = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and OTP are required",
+    });
+  }
+
+  const sanitizedEmail = sanitizeInput(email.toLowerCase());
+  const tempUser = await TemporaryUser.findOne({ email: sanitizedEmail });
+
+  if (!tempUser || !tempUser.registrationData?.is2FA) {
+    return res.status(404).json({
+      success: false,
+      message: "2FA session not found or expired",
+    });
+  }
+
+  if (tempUser.otp !== otp.toUpperCase() || Date.now() > tempUser.otpExpires) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired OTP",
+    });
+  }
+
+  // Get user
+  const user = await User.findById(tempUser.registrationData.userId);
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
   // Update last activity on login
   user.lastActivity = new Date();
-  await user.save();
+  await user.save({ validateBeforeSave: false });
+
+  // Remove from temporary users
+  await TemporaryUser.deleteOne({ email: sanitizedEmail });
 
   const token = user.generateToken();
 
@@ -263,6 +351,77 @@ const verifyOTP = asyncHandler(async (req, res) => {
     isAddingRole: registrationData.isAddingRole || false,
     newRole: registrationData.isAddingRole ? registrationData.role : null,
   });
+});
+
+// Resend 2FA OTP
+const resend2FA = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Email is required",
+    });
+  }
+
+  const sanitizedEmail = sanitizeInput(email.toLowerCase());
+  
+  // Check if user exists
+  const user = await User.findOne({ email: sanitizedEmail });
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  // Generate new OTP
+  const otp = crypto.randomBytes(3).toString("hex").toUpperCase();
+  const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  // Update OTP on existing 2FA session, or create a new one
+  const existing = await TemporaryUser.findOne({ email: sanitizedEmail });
+  if (existing && existing.registrationData?.is2FA) {
+    existing.otp = otp;
+    existing.otpExpires = otpExpires;
+    await existing.save();
+  } else {
+    await TemporaryUser.findOneAndUpdate(
+      { email: sanitizedEmail },
+      {
+        email: sanitizedEmail,
+        otp,
+        otpExpires,
+        registrationData: {
+          userId: user._id,
+          is2FA: true,
+        },
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  // Send new OTP via email
+  try {
+    await sendEmail({
+      email: sanitizedEmail,
+      subject: "WorkDeck - Login Verification Code (Resent)",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Login Verification</h2>
+          <p>Your new verification code is:</p>
+          <div style="background: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #1f2937; font-size: 32px; margin: 0;">${otp}</h1>
+          </div>
+          <p>This code will expire in 10 minutes.</p>
+        </div>
+      `,
+    });
+  } catch (emailError) {
+    console.log(`Email failed, 2FA OTP for ${sanitizedEmail}: ${otp}`);
+  }
+
+  res.json({ success: true, message: "New verification code sent to your email" });
 });
 
 // Resend OTP
@@ -931,6 +1090,8 @@ const resetPassword = asyncHandler(async (req, res) => {
 module.exports = {
   register,
   login,
+  verify2FA,
+  resend2FA,
   verifyOTP,
   resendOTP,
   completeProfile,

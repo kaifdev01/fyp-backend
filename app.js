@@ -115,12 +115,18 @@ const userRoutes = require("./routes/userRoutes");
 const freelancerRoutes = require("./routes/freelancerRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const jobRoutes = require("./routes/jobRoutes");
+const proposalRoutes = require("./routes/proposalRoutes");
+const skillsRoutes = require("./routes/skillsRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/freelancer", freelancerRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/proposals", proposalRoutes);
+app.use("/api/skills", skillsRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Server is running" });
