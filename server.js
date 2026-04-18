@@ -15,7 +15,7 @@ const server = http.createServer(app);
 // Setup Socket.IO with CORS
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "*",
     methods: ["GET", "POST"],
     credentials: true
   }
